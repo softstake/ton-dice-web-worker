@@ -1,0 +1,8 @@
+Service:
+  TonConfig: "tonlib.config.json.example"
+  ContractAddress: "kQBORXUnT4HjFLxx06X9b0VONDJeHDOGrJe5MbYwIjieWYvJ"
+  LiteClient: "bin/lite-client"
+  LiteClientConfig: "ton-lite-client-test1.config.json"
+  ResolveQuery: "resolve-query.fif"
+  KeyFileBase: "denis"
+  SavedTrxLt: "trxlt.save"

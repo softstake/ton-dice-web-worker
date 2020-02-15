@@ -1,0 +1,40 @@
+#!/usr/bin/fift -s
+
+"TonUtil.fif" include
+
+{ ."usage: " @' $0 type ."<filename-base> <dice-addr> <seqno> <bet-id> <seed> [<savefile>]" cr
+  ."Creates request a resolve bet to fair dice game"
+  ."and saves it into <savefile>.boc ('resolve-query.boc' by default)" cr 1 halt
+} : usage
+
+$# 7 < ' usage if
+
+false constant bounce
+
+$1 parse-int =: seqno
+$2 =: file-base
+$3 bounce parse-load-address =: bounce 2=: source_addr
+$4 bounce parse-load-address =: bounce 2=: dest_addr
+$5 $>GR =: amount
+$6 =: roll_under
+$7 =: bet_id
+
+file-base +".pk" load-keypair nip constant wallet_pk
+
+<b "Pn3W_qDMjSUpaRPdNq_OSpnM7yKK6ia" $, b>
+<b roll_under $, "," $, bet_id $, "," $, "EQBd1s6ZuawHkd9O_" $, swap ref, b>
+
+// def? $8 { swap <s "," $, @' $8 $, } {} cond
+
+// create a message (NB: 01b00.., b = bounce)
+<b b{01} s, bounce 1 i, b{000100} s, dest_addr addr,
+   amount Gram, 0 9 64 32 + + 1+ 1+ u, 0 32 u, swap <s s, b>
+<b seqno 32 u, 1 8 u, swap ref, b>
+dup ."enveloping message: " <s csr. cr
+dup hashu wallet_pk ed25519_sign_uint
+<b b{1000100} s, source_addr addr, 0 Gram, b{00} s,
+   swap B, swap <s s, b>
+dup ."resulting external message: " <s csr. cr
+2 boc+>B dup Bx. cr
+"bet-query.boc" tuck B>file
+."(Saved to file " type .")" cr
