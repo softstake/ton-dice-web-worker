@@ -144,7 +144,6 @@ func (s *TonService) GetLastTrxHash() (string, error) {
 	return hash, nil
 }
 
-// deprecated, see apiClient
 func (s *TonService) GetSeqno() (int, error) {
 	raw, err := s.lc.RunMethod(s.conf.Service.ContractAddress, "get_seqno")
 	if err != nil {
