@@ -87,6 +87,7 @@ func (s *WorkerService) ResolveBet(resolved *Bet) (*Bet, bool) {
 	t := time.Now().UTC()
 	bet.TimeResolved = &t
 	bet.RandomRoll = resolved.RandomRoll
+	bet.PlayerPayout = resolved.PlayerPayout
 	s.mutex.Lock()
 	s.bets[resolved.ID] = bet
 	s.mutex.Unlock()
@@ -149,8 +150,14 @@ func (s *WorkerService) Run() {
 						log.Errorf("output message parse failed with %s\n", err)
 						continue
 					}
+					betInfo.PlayerPayout = outMsg.Value
 					// storing bet results information in-memory
 					inMemoryBet, isResolved := s.ResolveBet(betInfo)
+
+					// if the bet information is not complete, skip it
+					if inMemoryBet.RollUnder == 0 || inMemoryBet.Amount == 0 {
+						continue
+					}
 
 					if !isSavedInStorage(inMemoryBet) && isResolved {
 						// saving bet to the persistent storage
@@ -161,7 +168,6 @@ func (s *WorkerService) Run() {
 							continue
 						}
 						fmt.Printf("bet with id %d successfully saved (date: %s)", resp.Id, resp.CreatedAt)
-
 						inMemoryBet.IDInStorage = resp.Id
 						s.UpdateBet(inMemoryBet)
 					}
@@ -184,6 +190,7 @@ func (s *WorkerService) Run() {
 						continue
 					}
 					bet.RandomRoll = inMemoryBet.RandomRoll
+					bet.PlayerPayout = inMemoryBet.PlayerPayout
 					bet.TimeCreated = inMemoryBet.TimeCreated
 				}
 
@@ -210,7 +217,6 @@ func (s *WorkerService) Run() {
 				// if there is complete information about the bet, save it in a persistent storage
 				if bet.RandomRoll > 0 {
 					req := BuildCreateBetRequest(bet)
-
 					resp, err := s.storageClient.CreateBet(ctx, req)
 					if err != nil {
 						log.Errorf("save bet in DB failed with %s\n", err)

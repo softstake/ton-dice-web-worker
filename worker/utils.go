@@ -32,7 +32,7 @@ func parseInMessage(m string) (*Bet, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rollUnder < 2 || rollUnder > 98 {
+		if rollUnder < 2 || rollUnder > 96 {
 			return nil, fmt.Errorf("roll under is not valid")
 		}
 
@@ -106,6 +106,7 @@ func BuildCreateBetRequest(bet *Bet) *pb.CreateBetRequest {
 		Amount:        int64(bet.Amount),
 		RollUnder:     int32(bet.RollUnder),
 		RandomRoll:    int32(bet.RandomRoll),
+		PlayerPayout:  bet.PlayerPayout,
 		Seed:          bet.Seed,
 	}
 }

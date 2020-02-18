@@ -11,8 +11,8 @@ type Bet struct {
 	RandomRoll    int
 	Seed          string
 	Signature     string
-	PlayerPayout  float32
-	RefPayout     float32
+	PlayerPayout  int64
+	RefPayout     int64
 	TimeCreated   *time.Time
 	TimeResolved  *time.Time
 	IDInStorage   int64
