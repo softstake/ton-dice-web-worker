@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/cloudflare/cfssl/log"
@@ -8,7 +9,10 @@ import (
 	store "github.com/tonradar/ton-dice-web-server/proto"
 	"google.golang.org/grpc"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"ton-dice-web-worker/config"
@@ -16,7 +20,6 @@ import (
 
 type WorkerService struct {
 	conf          config.Config
-	ton           *TonService
 	mutex         *sync.RWMutex
 	bets          map[int]*Bet
 	storageClient store.BetsClient
@@ -42,14 +45,8 @@ func NewWorkerService(conf config.Config) *WorkerService {
 
 	client2 := api.NewTonApiClient(conn)
 
-	ton, err := NewTonService(conf)
-	if err != nil {
-		log.Errorf("error initialize TON service: %v", err)
-	}
-
 	return &WorkerService{
 		conf:          conf,
-		ton:           ton,
 		mutex:         &sync.RWMutex{},
 		bets:          make(map[int]*Bet, 100),
 		storageClient: client,
@@ -77,7 +74,7 @@ func (s *WorkerService) UpdateBet(bet *Bet) *Bet {
 	return bet
 }
 
-func (s *WorkerService) ResolveBet(resolved *Bet) (*Bet, bool) {
+func (s *WorkerService) resolveBet(resolved *Bet) (*Bet, bool) {
 	isResolved := true
 	bet := s.GetBet(resolved.ID)
 	if bet == nil {
@@ -93,6 +90,49 @@ func (s *WorkerService) ResolveBet(resolved *Bet) (*Bet, bool) {
 	s.mutex.Unlock()
 
 	return s.GetBet(resolved.ID), isResolved
+}
+
+func (s *WorkerService) ResolveBet(betId int, seqno string, seed string) error {
+	fileNameWithPath := s.conf.Service.ResolveQuery
+	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
+	fileName := fileNameWithPath[fileNameStart+1:]
+
+	bocFile := strings.Replace(fileName, ".fif", ".boc", 1)
+
+	_ = os.Remove(bocFile)
+
+	var out bytes.Buffer
+	cmd := exec.Command("fift", "-s", fileNameWithPath, s.conf.Service.KeyFileBase, s.conf.Service.ContractAddress, seqno, strconv.Itoa(betId), seed)
+
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Errorf("cmd.Run() failed with %s\n", err)
+		return err
+	}
+
+	if FileExists(bocFile) {
+		data, err := ioutil.ReadFile(bocFile)
+		if err != nil {
+			log.Error(err)
+		}
+
+		sendMessageRequest := &api.SendMessageRequest{
+			Body: data,
+		}
+
+		sendMessageResponse, err := s.apiClient.SendMessage(context.Background(), sendMessageRequest)
+		if err != nil {
+			log.Error(err)
+		}
+
+		fmt.Printf("ResolveBet: send message status: %v", sendMessageResponse.Ok)
+
+		return nil
+	}
+
+	return fmt.Errorf("File not found, maybe fift compile failed?")
+
 }
 
 func (s *WorkerService) Run() {
@@ -152,7 +192,7 @@ func (s *WorkerService) Run() {
 					}
 					betInfo.PlayerPayout = outMsg.Value
 					// storing bet results information in-memory
-					inMemoryBet, isResolved := s.ResolveBet(betInfo)
+					inMemoryBet, isResolved := s.resolveBet(betInfo)
 
 					// if the bet information is not complete, skip it
 					if inMemoryBet.RollUnder == 0 || inMemoryBet.Amount == 0 {
@@ -228,7 +268,13 @@ func (s *WorkerService) Run() {
 					s.UpdateBet(bet)
 				}
 
-				err = s.ton.ResolveBet(bet.ID, seed)
+				getSeqnoResponse, err := s.apiClient.GetSeqno(ctx, &api.GetSeqnoRequest{})
+				if err != nil {
+					log.Errorf("Error get account state: %v", err)
+					return
+				}
+
+				err = s.ResolveBet(bet.ID, getSeqnoResponse.Seqno, seed)
 				if err != nil {
 					log.Errorf("failed to resolve bet with %s\n", err)
 					continue
