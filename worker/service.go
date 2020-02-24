@@ -18,6 +18,24 @@ import (
 	"ton-dice-web-worker/config"
 )
 
+var (
+	storageHost string
+	storagePort string
+	tonApiHost  string
+	tonApiPort  string
+)
+
+func init() {
+	storageHost = os.Getenv("STORAGE_HOST")
+	storagePort = os.Getenv("STORAGE_PORT")
+	tonApiHost = os.Getenv("TON_API_HOST")
+	tonApiPort = os.Getenv("TON_API_PORT")
+
+	if storageHost == "" || storagePort == "" || tonApiHost == "" || tonApiPort == "" {
+		log.Fatal("Some of required ENV vars are empty. The vars are: STORAGE_HOST, STORAGE_PORT, TON_API_HOST, TON_API_PORT")
+	}
+}
+
 type WorkerService struct {
 	conf          config.Config
 	mutex         *sync.RWMutex
@@ -31,14 +49,14 @@ func NewWorkerService(conf config.Config) *WorkerService {
 		grpc.WithInsecure(),
 	}
 
-	conn, err := grpc.Dial("127.0.0.1:5300", opts...)
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", storageHost, storagePort), opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 	}
 
 	client := store.NewBetsClient(conn)
 
-	conn, err = grpc.Dial("127.0.0.1:5400", opts...)
+	conn, err = grpc.Dial(fmt.Sprintf("%s:%s", tonApiHost, tonApiPort), opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 	}
@@ -132,7 +150,6 @@ func (s *WorkerService) ResolveBet(betId int, seqno string, seed string) error {
 	}
 
 	return fmt.Errorf("File not found, maybe fift compile failed?")
-
 }
 
 func (s *WorkerService) Run() {
