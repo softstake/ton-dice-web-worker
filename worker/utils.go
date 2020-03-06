@@ -20,8 +20,6 @@ func parseInMessage(m string) (*Bet, error) {
 		return nil, err
 	}
 
-	fmt.Println("MESSAGE:", string(msg))
-
 	if len(msg) > 0 {
 		parts := strings.Split(string(msg), ",")
 		if len(parts) < 2 || len(parts) > 3 {
@@ -67,18 +65,15 @@ func parseOutMessage(m string) (*Bet, error) {
 		r, _ := regexp.Compile(`ton777.io - lucky number (\d+) fell for betting with id (\d+)`)
 		matches := r.FindStringSubmatch(string(msg))
 
-		fmt.Println("MATCHES:", matches)
+		if len(matches) > 0 {
+			randomRoll, _ := strconv.Atoi(matches[1])
+			betID, _ := strconv.Atoi(matches[2])
 
-		randomRoll, _ := strconv.Atoi(matches[1])
-		betID, _ := strconv.Atoi(matches[2])
-
-		fmt.Println("RANDOM_ROLL:", randomRoll)
-		fmt.Println("BET_ID:", betID)
-
-		return &Bet{
-			ID:         betID,
-			RandomRoll: randomRoll,
-		}, nil
+			return &Bet{
+				ID:         betID,
+				RandomRoll: randomRoll,
+			}, nil
+		}
 	}
 
 	return nil, fmt.Errorf("message is not valid")
