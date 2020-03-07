@@ -141,7 +141,8 @@ func (s *WorkerService) ResolveBet(betId int, seqno string, seed string) error {
 
 		sendMessageResponse, err := s.apiClient.SendMessage(context.Background(), sendMessageRequest)
 		if err != nil {
-			log.Error(err)
+			// need restart container
+			panic(err)
 		}
 
 		fmt.Printf("ResolveBet: send message status: %v", sendMessageResponse.Ok)
@@ -163,8 +164,8 @@ func (s *WorkerService) Run() {
 			}
 			getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
 			if err != nil {
-				log.Errorf("Error get account state: %v", err)
-				return
+				// need restart container
+				panic(fmt.Sprintf("Error get account state: %v", err))
 			}
 
 			lt := getAccountStateResponse.LastTransactionId.Lt
@@ -177,7 +178,7 @@ func (s *WorkerService) Run() {
 			}
 
 			if lt <= int64(savedTrxLt) {
-				log.Warningf("saved trx time (%d) is greater than current (%d)", savedTrxLt, lt)
+				//log.Warningf("saved trx time (%d) is greater than current (%d)", savedTrxLt, lt)
 				continue
 			}
 
@@ -195,7 +196,8 @@ func (s *WorkerService) Run() {
 
 			fetchTransactionsResponse, err := s.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
 			if err != nil {
-				log.Warningf("failed to fetch transactions: %v", err)
+				// need restart container
+				panic(fmt.Sprintf("failed to fetch transactions: %v", err))
 			}
 			transactions := fetchTransactionsResponse.Items
 
@@ -263,8 +265,8 @@ func (s *WorkerService) Run() {
 
 				getBetSeedResponse, err := s.apiClient.GetBetSeed(ctx, req)
 				if err != nil {
-					log.Errorf("failed to run GetBetSeed method: %v", err)
-					continue
+					// need restart container
+					panic(fmt.Sprintf("failed to run GetBetSeed method: %v", err))
 				}
 				seed := getBetSeedResponse.Seed
 
@@ -287,8 +289,8 @@ func (s *WorkerService) Run() {
 
 				getSeqnoResponse, err := s.apiClient.GetSeqno(ctx, &api.GetSeqnoRequest{})
 				if err != nil {
-					log.Errorf("Error get account state: %v", err)
-					return
+					// need restart container
+					panic(fmt.Sprintf("Error get seqno: %v", err))
 				}
 
 				err = s.ResolveBet(bet.ID, getSeqnoResponse.Seqno, seed)
