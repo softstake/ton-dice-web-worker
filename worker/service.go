@@ -153,6 +153,146 @@ func (s *WorkerService) ResolveBet(betId int, seqno string, seed string) error {
 	return fmt.Errorf("File not found, maybe fift compile failed?")
 }
 
+func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, depth int) (int64, string) {
+	fetchTransactionsRequest := &api.FetchTransactionsRequest{
+		Address: s.conf.Service.ContractAddress,
+		Lt:      lt,
+		Hash:    hash,
+	}
+
+	fetchTransactionsResponse, err := s.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
+	if err != nil {
+		// need restart container
+		panic(fmt.Sprintf("failed to fetch transactions: %v", err))
+	}
+	transactions := fetchTransactionsResponse.Items
+	var trx *api.Transaction
+
+	for _, trx = range transactions {
+
+		for _, outMsg := range trx.OutMsgs {
+			// getting information about the results of the bet
+			betInfo, err := parseOutMessage(outMsg.Message)
+			if err != nil {
+				log.Errorf("output message parse failed with %s\n", err)
+				continue
+			}
+			betInfo.PlayerPayout = outMsg.Value
+			// storing bet results information in-memory
+			inMemoryBet, isResolved := s.resolveBet(betInfo)
+
+			// if the bet information is not complete, skip it
+			if inMemoryBet.RollUnder == 0 || inMemoryBet.Amount == 0 {
+				continue
+			}
+
+			if !isSavedInStorage(inMemoryBet) && isResolved {
+				// saving bet to the persistent storage
+				req := BuildCreateBetRequest(inMemoryBet)
+				resp, err := s.storageClient.CreateBet(ctx, req)
+				if err != nil {
+					log.Errorf("save bet in DB failed with %s\n", err)
+					continue
+				}
+				fmt.Printf("bet with id %d successfully saved (date: %s)", resp.Id, resp.CreatedAt)
+				inMemoryBet.IDInStorage = resp.Id
+				s.UpdateBet(inMemoryBet)
+			}
+		}
+
+		inMsg := trx.InMsg
+
+		// getting information about a new bet
+		bet, err := parseInMessage(inMsg.Message)
+		if err != nil {
+			log.Errorf("input message parse failed with %s\n", err)
+			continue
+		}
+		bet.TrxHash = trx.TransactionId.Hash
+		bet.TrxLt = trx.TransactionId.Lt
+
+		isBetExistReq := &store.IsBetExistRequest{
+			GameId:  int32(bet.ID),
+			TrxHash: bet.TrxHash,
+			TrxLt:   bet.TrxLt,
+		}
+
+		resp, err := s.storageClient.IsBetExist(ctx, isBetExistReq)
+		if err != nil {
+			log.Errorf("check bet exist failed with %s\n", err)
+			continue
+		}
+		if resp.Yes {
+			continue
+		}
+
+		// if there is bet information in-memory
+		inMemoryBet := s.GetBet(bet.ID)
+		if inMemoryBet != nil {
+			// if the bet is stored in persistent storage, then skip it
+			if isSavedInStorage(inMemoryBet) {
+				continue
+			}
+			bet.RandomRoll = inMemoryBet.RandomRoll
+			bet.PlayerPayout = inMemoryBet.PlayerPayout
+			bet.TimeCreated = inMemoryBet.TimeCreated
+		}
+
+		playerAddress := inMsg.Source
+		bet.PlayerAddress = playerAddress
+
+		amount := inMsg.Value
+		bet.Amount = int(amount)
+
+		getBetSeedReq := &api.GetBetSeedRequest{
+			BetId: int64(bet.ID),
+		}
+
+		getBetSeedResponse, err := s.apiClient.GetBetSeed(ctx, getBetSeedReq)
+		if err != nil {
+			// need restart container
+			panic(fmt.Sprintf("failed to run GetBetSeed method: %v", err))
+		}
+		seed := getBetSeedResponse.Seed
+
+		bet.Seed = seed
+		bet = s.UpdateBet(bet)
+
+		// if there is complete information about the bet, save it in a persistent storage
+		if bet.RandomRoll > 0 {
+			req := BuildCreateBetRequest(bet)
+			resp, err := s.storageClient.CreateBet(ctx, req)
+			if err != nil {
+				log.Errorf("save bet in DB failed with %s\n", err)
+				continue
+			}
+			fmt.Printf("bet with id %d successfully saved (date: %s)", resp.Id, resp.CreatedAt)
+
+			bet.IDInStorage = resp.Id
+			s.UpdateBet(bet)
+		}
+
+		getSeqnoResponse, err := s.apiClient.GetSeqno(ctx, &api.GetSeqnoRequest{})
+		if err != nil {
+			// need restart container
+			panic(fmt.Sprintf("Error get seqno: %v", err))
+		}
+
+		err = s.ResolveBet(bet.ID, getSeqnoResponse.Seqno, seed)
+		if err != nil {
+			log.Errorf("failed to resolve bet with %s\n", err)
+			continue
+		}
+	}
+
+	if depth > 0 {
+		depth -= 1
+		return s.ProcessBets(ctx, trx.TransactionId.Lt, trx.TransactionId.Hash, depth)
+	}
+
+	return trx.TransactionId.Lt, trx.TransactionId.Hash
+}
+
 func (s *WorkerService) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -188,135 +328,8 @@ func (s *WorkerService) Run() {
 				return
 			}
 
-			fetchTransactionsRequest := &api.FetchTransactionsRequest{
-				Address: s.conf.Service.ContractAddress,
-				Lt:      lt,
-				Hash:    hash,
-			}
-
-			fetchTransactionsResponse, err := s.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
-			if err != nil {
-				// need restart container
-				panic(fmt.Sprintf("failed to fetch transactions: %v", err))
-			}
-			transactions := fetchTransactionsResponse.Items
-
-			for _, trx := range transactions {
-
-				for _, outMsg := range trx.OutMsgs {
-					// getting information about the results of the bet
-					betInfo, err := parseOutMessage(outMsg.Message)
-					if err != nil {
-						log.Errorf("output message parse failed with %s\n", err)
-						continue
-					}
-					betInfo.PlayerPayout = outMsg.Value
-					// storing bet results information in-memory
-					inMemoryBet, isResolved := s.resolveBet(betInfo)
-
-					// if the bet information is not complete, skip it
-					if inMemoryBet.RollUnder == 0 || inMemoryBet.Amount == 0 {
-						continue
-					}
-
-					if !isSavedInStorage(inMemoryBet) && isResolved {
-						// saving bet to the persistent storage
-						req := BuildCreateBetRequest(inMemoryBet)
-						resp, err := s.storageClient.CreateBet(ctx, req)
-						if err != nil {
-							log.Errorf("save bet in DB failed with %s\n", err)
-							continue
-						}
-						fmt.Printf("bet with id %d successfully saved (date: %s)", resp.Id, resp.CreatedAt)
-						inMemoryBet.IDInStorage = resp.Id
-						s.UpdateBet(inMemoryBet)
-					}
-				}
-
-				inMsg := trx.InMsg
-
-				// getting information about a new bet
-				bet, err := parseInMessage(inMsg.Message)
-				if err != nil {
-					log.Errorf("input message parse failed with %s\n", err)
-					continue
-				}
-				bet.TrxHash = trx.TransactionId.Hash
-				bet.TrxLt = trx.TransactionId.Lt
-
-				isBetExistReq := &store.IsBetExistRequest{
-					GameId:  int32(bet.ID),
-					TrxHash: bet.TrxHash,
-					TrxLt:   bet.TrxLt,
-				}
-
-				resp, err := s.storageClient.IsBetExist(ctx, isBetExistReq)
-				if err != nil {
-					log.Errorf("check bet exist failed with %s\n", err)
-					continue
-				}
-				if resp.Yes {
-					continue
-				}
-
-				// if there is bet information in-memory
-				inMemoryBet := s.GetBet(bet.ID)
-				if inMemoryBet != nil {
-					// if the bet is stored in persistent storage, then skip it
-					if isSavedInStorage(inMemoryBet) {
-						continue
-					}
-					bet.RandomRoll = inMemoryBet.RandomRoll
-					bet.PlayerPayout = inMemoryBet.PlayerPayout
-					bet.TimeCreated = inMemoryBet.TimeCreated
-				}
-
-				playerAddress := inMsg.Source
-				bet.PlayerAddress = playerAddress
-
-				amount := inMsg.Value
-				bet.Amount = int(amount)
-
-				getBetSeedReq := &api.GetBetSeedRequest{
-					BetId: int64(bet.ID),
-				}
-
-				getBetSeedResponse, err := s.apiClient.GetBetSeed(ctx, getBetSeedReq)
-				if err != nil {
-					// need restart container
-					panic(fmt.Sprintf("failed to run GetBetSeed method: %v", err))
-				}
-				seed := getBetSeedResponse.Seed
-
-				bet.Seed = seed
-				bet = s.UpdateBet(bet)
-
-				// if there is complete information about the bet, save it in a persistent storage
-				if bet.RandomRoll > 0 {
-					req := BuildCreateBetRequest(bet)
-					resp, err := s.storageClient.CreateBet(ctx, req)
-					if err != nil {
-						log.Errorf("save bet in DB failed with %s\n", err)
-						continue
-					}
-					fmt.Printf("bet with id %d successfully saved (date: %s)", resp.Id, resp.CreatedAt)
-
-					bet.IDInStorage = resp.Id
-					s.UpdateBet(bet)
-				}
-
-				getSeqnoResponse, err := s.apiClient.GetSeqno(ctx, &api.GetSeqnoRequest{})
-				if err != nil {
-					// need restart container
-					panic(fmt.Sprintf("Error get seqno: %v", err))
-				}
-
-				err = s.ResolveBet(bet.ID, getSeqnoResponse.Seqno, seed)
-				if err != nil {
-					log.Errorf("failed to resolve bet with %s\n", err)
-					continue
-				}
-			}
+			shiftLt, shiftHash := s.ProcessBets(ctx, lt, hash, 0)
+			go s.ProcessBets(ctx, shiftLt, shiftHash, 10)
 
 			time.Sleep(1000 * time.Millisecond)
 		}
