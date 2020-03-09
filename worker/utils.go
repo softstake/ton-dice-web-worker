@@ -79,7 +79,7 @@ func parseOutMessage(m string) (*Bet, error) {
 	return nil, fmt.Errorf("message is not valid")
 }
 
-func SavedTrxLt(fn string) (int, error) {
+func GetSavedTrxLt(fn string) (int, error) {
 	data, err := ioutil.ReadFile(fn)
 	if err != nil {
 		return 0, err
@@ -103,6 +103,8 @@ func BuildCreateBetRequest(bet *Bet) *pb.CreateBetRequest {
 		RandomRoll:    int32(bet.RandomRoll),
 		PlayerPayout:  bet.PlayerPayout,
 		Seed:          bet.Seed,
+		TrxHash:       bet.TrxHash,
+		TrxLt:         bet.TrxLt,
 	}
 }
 

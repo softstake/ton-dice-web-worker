@@ -16,4 +16,6 @@ type Bet struct {
 	TimeCreated   *time.Time
 	TimeResolved  *time.Time
 	IDInStorage   int64
+	TrxHash       string
+	TrxLt         int64
 }

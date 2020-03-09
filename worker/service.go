@@ -171,7 +171,7 @@ func (s *WorkerService) Run() {
 			lt := getAccountStateResponse.LastTransactionId.Lt
 			hash := getAccountStateResponse.LastTransactionId.Hash
 
-			savedTrxLt, err := SavedTrxLt(s.conf.Service.SavedTrxLt)
+			savedTrxLt, err := GetSavedTrxLt(s.conf.Service.SavedTrxLt)
 			if err != nil {
 				log.Errorf("Error get read saved trx time: %v", err)
 				return
@@ -252,6 +252,9 @@ func (s *WorkerService) Run() {
 					bet.PlayerPayout = inMemoryBet.PlayerPayout
 					bet.TimeCreated = inMemoryBet.TimeCreated
 				}
+
+				bet.TrxHash = hash
+				bet.TrxLt = lt
 
 				playerAddress := inMsg.Source
 				bet.PlayerAddress = playerAddress
