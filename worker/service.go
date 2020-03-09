@@ -202,6 +202,7 @@ func (s *WorkerService) Run() {
 			transactions := fetchTransactionsResponse.Items
 
 			for _, trx := range transactions {
+
 				for _, outMsg := range trx.OutMsgs {
 					// getting information about the results of the bet
 					betInfo, err := parseOutMessage(outMsg.Message)
@@ -240,6 +241,23 @@ func (s *WorkerService) Run() {
 					log.Errorf("input message parse failed with %s\n", err)
 					continue
 				}
+				bet.TrxHash = trx.TransactionId.Hash
+				bet.TrxLt = trx.TransactionId.Lt
+
+				isBetExistReq := &store.IsBetExistRequest{
+					GameId:  int32(bet.ID),
+					TrxHash: bet.TrxHash,
+					TrxLt:   bet.TrxLt,
+				}
+
+				resp, err := s.storageClient.IsBetExist(ctx, isBetExistReq)
+				if err != nil {
+					log.Errorf("check bet exist failed with %s\n", err)
+					continue
+				}
+				if resp.Yes {
+					continue
+				}
 
 				// if there is bet information in-memory
 				inMemoryBet := s.GetBet(bet.ID)
@@ -253,20 +271,17 @@ func (s *WorkerService) Run() {
 					bet.TimeCreated = inMemoryBet.TimeCreated
 				}
 
-				bet.TrxHash = hash
-				bet.TrxLt = lt
-
 				playerAddress := inMsg.Source
 				bet.PlayerAddress = playerAddress
 
 				amount := inMsg.Value
 				bet.Amount = int(amount)
 
-				req := &api.GetBetSeedRequest{
+				getBetSeedReq := &api.GetBetSeedRequest{
 					BetId: int64(bet.ID),
 				}
 
-				getBetSeedResponse, err := s.apiClient.GetBetSeed(ctx, req)
+				getBetSeedResponse, err := s.apiClient.GetBetSeed(ctx, getBetSeedReq)
 				if err != nil {
 					// need restart container
 					panic(fmt.Sprintf("failed to run GetBetSeed method: %v", err))

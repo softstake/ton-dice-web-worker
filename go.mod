@@ -11,7 +11,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/viper v1.6.2
 	github.com/tonradar/ton-api v0.0.0-20200308061202-98c06cdb350c
-	github.com/tonradar/ton-dice-web-server v0.0.0-20200309085732-f98a3a63a96e
+	github.com/tonradar/ton-dice-web-server v0.0.0-20200309101204-9bfe896f057a
 	github.com/tonradar/tonlib-go v1.1.1 // indirect
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a // indirect
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect

@@ -211,6 +211,8 @@ github.com/tonradar/ton-dice-web-server v0.0.0-20200217084957-94029079c60c h1:6s
 github.com/tonradar/ton-dice-web-server v0.0.0-20200217084957-94029079c60c/go.mod h1:VzGRpY0XfC2i4TqspQfCAoYJIy1EY90JzW3oLEqdnYY=
 github.com/tonradar/ton-dice-web-server v0.0.0-20200309085732-f98a3a63a96e h1:Cmcghmo//+IvOi/Tmi/ZpcjCb2bssGoWu1jeca34vOY=
 github.com/tonradar/ton-dice-web-server v0.0.0-20200309085732-f98a3a63a96e/go.mod h1:VzGRpY0XfC2i4TqspQfCAoYJIy1EY90JzW3oLEqdnYY=
+github.com/tonradar/ton-dice-web-server v0.0.0-20200309101204-9bfe896f057a h1:fto5SBcYQtNa9JCsiVPluCAfktrjHxfkq8c12PzZz/w=
+github.com/tonradar/ton-dice-web-server v0.0.0-20200309101204-9bfe896f057a/go.mod h1:VzGRpY0XfC2i4TqspQfCAoYJIy1EY90JzW3oLEqdnYY=
 github.com/tonradar/tonlib-go v1.1.1/go.mod h1:7ZfzKTnR4mffcMQoegtFntAL/Ycr1CMcXwipBaaY/Xg=
 github.com/tonradar/tonlib-go/v2 v2.0.2/go.mod h1:+R5R1C2cnpiZot4MVYwShgPlJK5cku8fwoRxfTnM/mo=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
