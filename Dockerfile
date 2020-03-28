@@ -26,7 +26,7 @@ COPY --from=builder /go/src/build/bet-query.fif /app/
 COPY --from=builder /go/src/build/resolve-query.fif /app/
 COPY --from=builder /go/src/build/ton-lite-client-test1.config.json /app/
 COPY --from=builder /go/src/build/tonlib.config.json.example /app/
-COPY --from=builder /go/src/build/denis.pk /app/
+COPY --from=builder /go/src/build/owner.pk /app/
 COPY --from=builder /go/src/build/trxlt.save.default /app/
 RUN cp trxlt.save.default trxlt.save
 
