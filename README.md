@@ -1,6 +1,21 @@
 # ton-dice-web-worker
 resolving bets and send them to the dice server to save
 
+Resolve bets:
+ - ton-api grpc 
+
+ Save bets:
+ - ton-dice-web-server grpc
+
+ TODO:
+  - remove unused lite-client
+  - remove unused store package
+  - move config to ENV vars
+  - remove fift stuff
+  - change Makefile to use access token instead of SSH key
+  - Update README.md to actual
+
+
 ## build 
 ```MY_KEY=$(cat ~/.ssh/id_rsa)```
 
