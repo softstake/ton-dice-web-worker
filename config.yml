@@ -4,5 +4,5 @@ Service:
   LiteClient: "bin/lite-client"
   LiteClientConfig: "ton-lite-client-test1.config.json"
   ResolveQuery: "resolve-query.fif"
-  KeyFileBase: "denis"
+  KeyFileBase: "owner"
   SavedTrxLt: "trxlt.save"

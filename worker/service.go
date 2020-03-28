@@ -169,7 +169,6 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 	var trx *api.Transaction
 
 	for _, trx = range transactions {
-
 		for _, outMsg := range trx.OutMsgs {
 			// getting information about the results of the bet
 			betInfo, err := parseOutMessage(outMsg.Message)
@@ -331,7 +330,7 @@ func (s *WorkerService) Run() {
 			shiftLt, shiftHash := s.ProcessBets(ctx, lt, hash, 0)
 			go s.ProcessBets(ctx, shiftLt, shiftHash, 10)
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(3000 * time.Millisecond)
 		}
 	}()
 
