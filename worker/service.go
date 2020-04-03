@@ -303,8 +303,9 @@ func (s *WorkerService) Run() {
 			}
 			getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
 			if err != nil {
+				continue
 				// need restart container
-				panic(fmt.Sprintf("Error get account state: %v", err))
+				// panic(fmt.Sprintf("Error get account state: %v", err))
 			}
 
 			lt := getAccountStateResponse.LastTransactionId.Lt
@@ -330,7 +331,7 @@ func (s *WorkerService) Run() {
 			shiftLt, shiftHash := s.ProcessBets(ctx, lt, hash, 0)
 			go s.ProcessBets(ctx, shiftLt, shiftHash, 10)
 
-			time.Sleep(3000 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}()
 
