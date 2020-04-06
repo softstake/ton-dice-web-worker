@@ -62,7 +62,7 @@ func parseOutMessage(m string) (*Bet, error) {
 	}
 
 	if len(msg) > 0 {
-		r, _ := regexp.Compile(`ton777.io - lucky number (\d+) fell for betting with id (\d+)`)
+		r, _ := regexp.Compile(`TONBET.IO - lucky number (\d+) fell for betting with id (\d+)`)
 		matches := r.FindStringSubmatch(string(msg))
 
 		if len(matches) > 0 {
@@ -93,23 +93,37 @@ func GetSavedTrxLt(fn string) (int, error) {
 	return savedTrxLt, nil
 }
 
-func BuildCreateBetRequest(bet *Bet) *pb.CreateBetRequest {
+func BuildCreateBetRequest(bet *Bet) (*pb.CreateBetRequest, error) {
+	if bet.ID == 0 || bet.PlayerAddress == "" || bet.Amount == 0 || bet.RollUnder == 0 || bet.Seed == "" || bet.CreateTrxHash == "" || bet.CreateTrxLt == 0 {
+		return nil, fmt.Errorf("build create bet request failed")
+	}
+
 	return &pb.CreateBetRequest{
 		GameId:        int32(bet.ID),
 		PlayerAddress: bet.PlayerAddress,
 		RefAddress:    bet.RefAddress,
 		Amount:        int64(bet.Amount),
 		RollUnder:     int32(bet.RollUnder),
-		RandomRoll:    int32(bet.RandomRoll),
-		PlayerPayout:  bet.PlayerPayout,
 		Seed:          bet.Seed,
-		TrxHash:       bet.TrxHash,
-		TrxLt:         bet.TrxLt,
-	}
+		CreateTrxHash: bet.CreateTrxHash,
+		CreateTrxLt:   bet.CreateTrxLt,
+	}, nil
 }
 
-func isSavedInStorage(bet *Bet) bool {
-	return bet.IDInStorage > 0
+func BuildUpdateBetRequest(bet *Bet) (*pb.UpdateBetRequest, error) {
+	if bet.IDInStorage == 0 || bet.ID == 0 || bet.RandomRoll == 0 || bet.ResolveTrxHash == "" || bet.ResolveTrxLt == 0 {
+		return nil, fmt.Errorf("build update bet request failed")
+	}
+
+	return &pb.UpdateBetRequest{
+		Id: 		   int32(bet.IDInStorage),
+		GameId:        int32(bet.ID),
+		RandomRoll:    int32(bet.RandomRoll),
+		PlayerPayout:  bet.PlayerPayout,
+		RefPayout:     bet.RefPayout,
+		ResolveTrxHash: bet.CreateTrxHash,
+		ResolveTrxLt:   bet.CreateTrxLt,
+	}, nil
 }
 
 func FileExists(filename string) bool {

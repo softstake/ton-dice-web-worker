@@ -10,8 +10,8 @@ require (
 	github.com/shopspring/decimal v0.0.0-20200105231215-408a2507e114 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/viper v1.6.2
-	github.com/tonradar/ton-api v0.0.0-20200308061202-98c06cdb350c
-	github.com/tonradar/ton-dice-web-server v0.0.0-20200309101204-9bfe896f057a
+	github.com/tonradar/ton-api v0.0.0-20200403081516-d02e9b937842
+	github.com/tonradar/ton-dice-web-server v0.0.0-20200404182242-99cc813b4bba
 	github.com/tonradar/tonlib-go v1.1.1 // indirect
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a // indirect
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
