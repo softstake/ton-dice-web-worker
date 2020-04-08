@@ -94,7 +94,7 @@ func GetSavedTrxLt(fn string) (int, error) {
 }
 
 func BuildCreateBetRequest(bet *Bet) (*pb.CreateBetRequest, error) {
-	if bet.ID == 0 || bet.PlayerAddress == "" || bet.Amount == 0 || bet.RollUnder == 0 || bet.Seed == "" || bet.CreateTrxHash == "" || bet.CreateTrxLt == 0 {
+	if bet.ID == 0 || bet.PlayerAddress == "" || bet.Amount == 0 || bet.RollUnder == 0 || bet.CreateTrxHash == "" || bet.CreateTrxLt == 0 {
 		return nil, fmt.Errorf("build create bet request failed")
 	}
 
@@ -104,7 +104,6 @@ func BuildCreateBetRequest(bet *Bet) (*pb.CreateBetRequest, error) {
 		RefAddress:    bet.RefAddress,
 		Amount:        int64(bet.Amount),
 		RollUnder:     int32(bet.RollUnder),
-		Seed:          bet.Seed,
 		CreateTrxHash: bet.CreateTrxHash,
 		CreateTrxLt:   bet.CreateTrxLt,
 	}, nil
@@ -116,13 +115,13 @@ func BuildUpdateBetRequest(bet *Bet) (*pb.UpdateBetRequest, error) {
 	}
 
 	return &pb.UpdateBetRequest{
-		Id: 		   int32(bet.IDInStorage),
-		GameId:        int32(bet.ID),
-		RandomRoll:    int32(bet.RandomRoll),
-		PlayerPayout:  bet.PlayerPayout,
-		RefPayout:     bet.RefPayout,
-		ResolveTrxHash: bet.CreateTrxHash,
-		ResolveTrxLt:   bet.CreateTrxLt,
+		Id:             bet.IDInStorage,
+		GameId:         int32(bet.ID),
+		RandomRoll:     int32(bet.RandomRoll),
+		PlayerPayout:   bet.PlayerPayout,
+		RefPayout:      bet.RefPayout,
+		ResolveTrxHash: bet.ResolveTrxHash,
+		ResolveTrxLt:   bet.ResolveTrxLt,
 	}, nil
 }
 
