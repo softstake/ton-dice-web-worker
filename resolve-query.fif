@@ -1,25 +1,28 @@
 "TonUtil.fif" include
 
-{ ."usage: " @' $0 type ."<filename-base> <dice-addr> <seqno> <bet-id> <seed> [<savefile>]" cr
+{ ."usage: " @' $0 type ."<filename-base> <dice-addr> <bet-id> <seed> [<savefile>]" cr
   ."Creates request a resolve bet to fair dice game"
   ."and saves it into <savefile>.boc ('resolve-query.boc' by default)" cr 1 halt
 } : usage
 
-$# 5 < ' usage if
+$# 4 < ' usage if
 
 false constant bounce
+60 =: timeout   // external message expires in 60 seconds
 
 $1 =: file-base
 $2 bounce parse-load-address =: bounce 2=: dest_addr
-$3 parse-int =: seqno
-$4 parse-int =: bet_id
-$5 parse-int =: seed
-def? $6 { @' $6 } { "resolve-query" } cond constant savefile
+$3 parse-int =: bet_id
+$4 parse-int =: seed
+def? $5 { @' $5 } { "resolve-query" } cond constant savefile
 
 file-base +".pk" file>B constant wallet_pk
 
-seed wallet_pk ed25519_sign_uint
-<b seqno 32 u, x{22222222} s, bet_id 32 u, swap B, b> // body: seqno opcode betid sig
+seed wallet_pk ed25519_sign_uint constant sig
+
+now timeout + 32 << <b x{22222222} s, bet_id 32 u, sig B, b> hashu 32 1<<1- and + =: query-id
+
+<b query-id 64 u, x{22222222} s, bet_id 32 u, sig B, b> // body: seqno opcode betid sig
 dup hashu wallet_pk ed25519_sign_uint // create signature of body
 
 <b b{1000100} s, dest_addr addr, 0 Gram, b{00} s, swap B, swap ref, b>

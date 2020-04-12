@@ -130,7 +130,7 @@ func (s *WorkerService) isBetResolved(ctx context.Context, bet *Bet) (*store.IsB
 	return resp, nil
 }
 
-func (s *WorkerService) ResolveQuery(betId int, seqno string, seed string) error {
+func (s *WorkerService) ResolveQuery(betId int, seed string) error {
 	fileNameWithPath := s.conf.Service.ResolveQuery
 	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
 	fileName := fileNameWithPath[fileNameStart+1:]
@@ -140,7 +140,7 @@ func (s *WorkerService) ResolveQuery(betId int, seqno string, seed string) error
 	_ = os.Remove(bocFile)
 
 	var out bytes.Buffer
-	cmd := exec.Command("fift", "-s", fileNameWithPath, s.conf.Service.KeyFileBase, s.conf.Service.ContractAddress, seqno, strconv.Itoa(betId), seed)
+	cmd := exec.Command("fift", "-s", fileNameWithPath, s.conf.Service.KeyFileBase, s.conf.Service.ContractAddress, strconv.Itoa(betId), seed)
 
 	cmd.Stderr = &out
 	err := cmd.Run()
@@ -162,7 +162,9 @@ func (s *WorkerService) ResolveQuery(betId int, seqno string, seed string) error
 		sendMessageResponse, err := s.apiClient.SendMessage(context.Background(), sendMessageRequest)
 		if err != nil {
 			// need restart container
-			panic(err)
+			//panic(err)
+			log.Errorf("failed ResolveQuery method with: %v", err)
+			return err
 		}
 
 		fmt.Printf("ResolveBet: send message status: %v", sendMessageResponse.Ok)
@@ -223,7 +225,7 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 						log.Errorf("update bet in DB failed with %s\n", err)
 						continue
 					}
-					fmt.Printf("bet with id %d successfully updated (date: %s)", resp.Id, resp.ResolvedAt)
+					fmt.Printf("bet with id %d successfully updated (date: %s)", bet.ID, resp.ResolvedAt)
 
 					s.RemoveBet(bet.ID)
 				} else {
@@ -282,14 +284,7 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 
 			// Resolve bet in TON:
 
-			getSeqnoResponse, err := s.apiClient.GetSeqno(ctx, &api.GetSeqnoRequest{})
-			if err != nil {
-				log.Errorf("Error get seqno: %v", err)
-				continue
-				//panic(fmt.Sprintf("Error get seqno: %v", err))
-			}
-
-			err = s.ResolveQuery(bet.ID, getSeqnoResponse.Seqno, bet.Seed)
+			err = s.ResolveQuery(bet.ID, bet.Seed)
 			if err != nil {
 				log.Errorf("failed to resolve bet with %s\n", err)
 				continue
@@ -298,7 +293,7 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 			bet.IDInStorage = isFetchedResponse.Id
 		}
 
-		// If the game results are already known, then we update bet in the database:
+		// If the game results are already known, then we update bet in the database
 		// Otherwise, save to memory
 		inMemoryBet := s.GetBet(bet.ID)
 		if inMemoryBet != nil {
@@ -321,12 +316,19 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 		}
 	}
 
-	if depth > 0 {
-		depth -= 1
-		return s.ProcessBets(ctx, trx.TransactionId.Lt, trx.TransactionId.Hash, depth)
+	_lt := lt
+	_hash := hash
+	if len(transactions) > 0 {
+		_lt = trx.TransactionId.Lt
+		_hash = trx.TransactionId.Hash
+		if depth > 0 {
+			depth -= 1
+			time.Sleep(1000 * time.Millisecond)
+			return s.ProcessBets(ctx, _lt, _hash, depth)
+		}
 	}
 
-	return trx.TransactionId.Lt, trx.TransactionId.Hash
+	return _lt, _hash
 }
 
 func (s *WorkerService) Run() {
@@ -337,6 +339,7 @@ func (s *WorkerService) Run() {
 		}
 		getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
 		if err != nil {
+			log.Errorf("failed GetAccountState with error: %v", err)
 			continue
 			// need restart container
 			// panic(fmt.Sprintf("Error get account state: %v", err))
@@ -361,6 +364,6 @@ func (s *WorkerService) Run() {
 			go s.ProcessBets(ctx, lt, hash, 10)
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 }
