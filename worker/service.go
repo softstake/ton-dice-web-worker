@@ -38,6 +38,7 @@ func init() {
 
 type WorkerService struct {
 	conf          config.Config
+	fetcher       *Fetcher
 	mutex         *sync.RWMutex
 	bets          map[int]*Bet
 	storageClient store.BetsClient
@@ -63,8 +64,11 @@ func NewWorkerService(conf config.Config) *WorkerService {
 
 	client2 := api.NewTonApiClient(conn)
 
+	fetcher := NewFetcher(conf)
+
 	return &WorkerService{
 		conf:          conf,
+		fetcher:       fetcher,
 		mutex:         &sync.RWMutex{},
 		bets:          make(map[int]*Bet, 100),
 		storageClient: client,
@@ -332,38 +336,72 @@ func (s *WorkerService) ProcessBets(ctx context.Context, lt int64, hash string, 
 }
 
 func (s *WorkerService) Run() {
-	ctx := context.Background()
-	for {
-		getAccountStateRequest := &api.GetAccountStateRequest{
-			AccountAddress: s.conf.Service.ContractAddress,
-		}
-		getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
-		if err != nil {
-			log.Errorf("failed GetAccountState with error: %v", err)
-			continue
-			// need restart container
-			// panic(fmt.Sprintf("Error get account state: %v", err))
-		}
-
-		lt := getAccountStateResponse.LastTransactionId.Lt
-		hash := getAccountStateResponse.LastTransactionId.Hash
-
-		savedTrxLt, err := GetSavedTrxLt(s.conf.Service.SavedTrxLt)
-		if err != nil {
-			log.Errorf("Error get read saved trx time: %v", err)
-			return
-		}
-
-		if lt > int64(savedTrxLt) {
-			err = ioutil.WriteFile(s.conf.Service.SavedTrxLt, []byte(strconv.Itoa(int(lt))), 0644)
-			if err != nil {
-				log.Errorf("Error write trx time to file: %v", err)
-				return
-			}
-
-			go s.ProcessBets(ctx, lt, hash, 10)
-		}
-
-		time.Sleep(1000 * time.Millisecond)
-	}
+	go s.fetcher.Start()
+	//for {
+	//	getAccountStateRequest := &api.GetAccountStateRequest{
+	//		AccountAddress: s.conf.Service.ContractAddress,
+	//	}
+	//	getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
+	//	if err != nil {
+	//		log.Errorf("failed GetAccountState with error: %v", err)
+	//		continue
+	//		// need restart container
+	//		// panic(fmt.Sprintf("Error get account state: %v", err))
+	//	}
+	//
+	//	lt := getAccountStateResponse.LastTransactionId.Lt
+	//	hash := getAccountStateResponse.LastTransactionId.Hash
+	//
+	//	savedTrxLt, err := GetSavedTrxLt(s.conf.Service.SavedTrxLt)
+	//	if err != nil {
+	//		log.Errorf("Error get read saved trx time: %v", err)
+	//		return
+	//	}
+	//
+	//	if lt > int64(savedTrxLt) {
+	//		err = ioutil.WriteFile(s.conf.Service.SavedTrxLt, []byte(strconv.Itoa(int(lt))), 0644)
+	//		if err != nil {
+	//			log.Errorf("Error write trx time to file: %v", err)
+	//			return
+	//		}
+	//
+	//		go s.ProcessBets(ctx, lt, hash, 10)
+	//	}
+	//
+	//	time.Sleep(1000 * time.Millisecond)
+	//}
+	//ctx := context.Background()
+	//for {
+	//	getAccountStateRequest := &api.GetAccountStateRequest{
+	//		AccountAddress: s.conf.Service.ContractAddress,
+	//	}
+	//	getAccountStateResponse, err := s.apiClient.GetAccountState(ctx, getAccountStateRequest)
+	//	if err != nil {
+	//		log.Errorf("failed GetAccountState with error: %v", err)
+	//		continue
+	//		// need restart container
+	//		// panic(fmt.Sprintf("Error get account state: %v", err))
+	//	}
+	//
+	//	lt := getAccountStateResponse.LastTransactionId.Lt
+	//	hash := getAccountStateResponse.LastTransactionId.Hash
+	//
+	//	savedTrxLt, err := GetSavedTrxLt(s.conf.Service.SavedTrxLt)
+	//	if err != nil {
+	//		log.Errorf("Error get read saved trx time: %v", err)
+	//		return
+	//	}
+	//
+	//	if lt > int64(savedTrxLt) {
+	//		err = ioutil.WriteFile(s.conf.Service.SavedTrxLt, []byte(strconv.Itoa(int(lt))), 0644)
+	//		if err != nil {
+	//			log.Errorf("Error write trx time to file: %v", err)
+	//			return
+	//		}
+	//
+	//		go s.ProcessBets(ctx, lt, hash, 10)
+	//	}
+	//
+	//	time.Sleep(1000 * time.Millisecond)
+	//}
 }
