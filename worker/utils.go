@@ -2,59 +2,20 @@ package worker
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/cloudflare/cfssl/log"
+	"github.com/joaojeronimo/go-crc16"
+	api "github.com/tonradar/ton-api/proto"
+	pb "github.com/tonradar/ton-dice-web-server/proto"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
-
-	pb "github.com/tonradar/ton-dice-web-server/proto"
 )
 
-func parseInMessage(m string) (*Bet, error) {
-	msg, err := base64.StdEncoding.DecodeString(m)
-	if err != nil {
-		log.Errorf("message decode failed with %s\n", err)
-		return nil, err
-	}
-
-	if len(msg) > 0 {
-		parts := strings.Split(string(msg), ",")
-		if len(parts) < 2 || len(parts) > 3 {
-			return nil, fmt.Errorf("message is not valid")
-		}
-
-		rollUnder, err := strconv.Atoi(parts[0])
-		if err != nil {
-			return nil, err
-		}
-		if rollUnder < 2 || rollUnder > 96 {
-			return nil, fmt.Errorf("roll under is not valid")
-		}
-
-		betID, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, err
-		}
-
-		refAddress := ""
-		if len(parts) == 3 {
-			refAddress = parts[2]
-		}
-
-		return &Bet{
-			ID:         betID,
-			RollUnder:  rollUnder,
-			RefAddress: refAddress,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("message is not valid")
-}
-
-func parseOutMessage(m string) (*Bet, error) {
+func parseOutMessage(m string) (*GameResult, error) {
 	msg, err := base64.StdEncoding.DecodeString(m)
 	if err != nil {
 		log.Errorf("message decode failed with %s\n", err)
@@ -69,14 +30,94 @@ func parseOutMessage(m string) (*Bet, error) {
 			randomRoll, _ := strconv.Atoi(matches[1])
 			betID, _ := strconv.Atoi(matches[2])
 
-			return &Bet{
-				ID:         betID,
-				RandomRoll: randomRoll,
-			}, nil
+			return &GameResult{Id: betID, RandomRoll: randomRoll}, nil
 		}
 	}
 
 	return nil, fmt.Errorf("message is not valid")
+}
+
+func BuildCreateBetRequest(bet *api.ActiveBet) (*pb.CreateBetRequest, error) {
+	i := new(big.Int)
+	i.SetString(bet.PlayerAddress.Address, 10)
+	hexPlayerAddr := fmt.Sprintf("%x", i)
+
+	playerAddr, err := packSmcAddr(int8(bet.PlayerAddress.Workchain), hexPlayerAddr, true, true)
+	if err != nil {
+		return nil, err
+	}
+
+	i = new(big.Int)
+	i.SetString(bet.RefAddress.Address, 10)
+	hexRefAddr := fmt.Sprintf("%x", i)
+
+	refAddr, err := packSmcAddr(int8(bet.RefAddress.Workchain), hexRefAddr, true, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if bet.Amount == 0 || bet.RollUnder == 0 || bet.Seed == "" {
+		return nil, fmt.Errorf("invalid bet")
+	}
+
+	return &pb.CreateBetRequest{
+		Id:            bet.Id,
+		PlayerAddress: playerAddr,
+		RefAddress:    refAddr,
+		Amount:        bet.Amount,
+		RollUnder:     bet.RollUnder,
+		Seed:          bet.Seed,
+	}, nil
+}
+
+func packSmcAddr(wc int8, hexAddr string, bounceble bool, testnet bool) (string, error) {
+	_hexAddr := hexAddr
+	if len(hexAddr) < 64 {
+		_hexAddr = fmt.Sprintf("%064s", hexAddr)
+	}
+
+	tag := 0x11 // for "bounceable" addresses
+	if !bounceble {
+		tag = 0x51 // for "non-bounceable"
+	}
+	if testnet {
+		tag += 0x80 // if the address should not be accepted by software running in the production network
+	}
+
+	var x []byte
+	_tag, err := hex.DecodeString(fmt.Sprintf("%x", tag)) // one tag byte
+	if err != nil {
+		panic(err)
+	}
+	x = append(x, _tag...)
+
+	_wc := []byte{0x00} // for the basic workchain
+	if wc != 0 {
+		// one byte containing a signed 8-bit integer with the workchain_id
+		tmp, err := hex.DecodeString(strconv.FormatUint(uint64(wc), 16))
+		if err != nil {
+			panic(err)
+		}
+		_wc = []byte{tmp[0]}
+	}
+	x = append(x, _wc[0])
+
+	_addr, err := hex.DecodeString(_hexAddr) // 32 bytes containing 256 bits of the smart-contract address inside the workchain (big-endian)
+	if err != nil {
+		panic(err)
+	}
+	x = append(x, _addr...)
+
+	crc := crc16.Crc16(x) // 2 bytes containing CRC16-CCITT of the previous 34 bytes
+
+	_crc, err := hex.DecodeString(fmt.Sprintf("%x", crc))
+	if err != nil {
+		panic(err)
+	}
+	x = append(x, _crc...)
+
+	encoded := base64.URLEncoding.EncodeToString(x)
+	return encoded, nil
 }
 
 func GetSavedTrxLt(fn string) (int, error) {
@@ -91,38 +132,6 @@ func GetSavedTrxLt(fn string) (int, error) {
 	}
 
 	return savedTrxLt, nil
-}
-
-func BuildCreateBetRequest(bet *Bet) (*pb.CreateBetRequest, error) {
-	if bet.ID == 0 || bet.PlayerAddress == "" || bet.Amount == 0 || bet.RollUnder == 0 || bet.CreateTrxHash == "" || bet.CreateTrxLt == 0 {
-		return nil, fmt.Errorf("build create bet request failed")
-	}
-
-	return &pb.CreateBetRequest{
-		GameId:        int32(bet.ID),
-		PlayerAddress: bet.PlayerAddress,
-		RefAddress:    bet.RefAddress,
-		Amount:        int64(bet.Amount),
-		RollUnder:     int32(bet.RollUnder),
-		CreateTrxHash: bet.CreateTrxHash,
-		CreateTrxLt:   bet.CreateTrxLt,
-	}, nil
-}
-
-func BuildUpdateBetRequest(bet *Bet) (*pb.UpdateBetRequest, error) {
-	if bet.IDInStorage == 0 || bet.ID == 0 || bet.RandomRoll == 0 || bet.ResolveTrxHash == "" || bet.ResolveTrxLt == 0 {
-		return nil, fmt.Errorf("build update bet request failed")
-	}
-
-	return &pb.UpdateBetRequest{
-		Id:             bet.IDInStorage,
-		GameId:         int32(bet.ID),
-		RandomRoll:     int32(bet.RandomRoll),
-		PlayerPayout:   bet.PlayerPayout,
-		RefPayout:      bet.RefPayout,
-		ResolveTrxHash: bet.ResolveTrxHash,
-		ResolveTrxLt:   bet.ResolveTrxLt,
-	}, nil
 }
 
 func FileExists(filename string) bool {

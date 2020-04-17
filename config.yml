@@ -1,6 +1,6 @@
 Service:
   TonConfig: "tonlib.config.json.example"
-  ContractAddress: "kf8Yo2glckNPd0UMkWOdz5H6TSgVJs7Qg-_4Sl9kL6mEzeju"
+  ContractAddress: "kf8D6cz-Sxz5r0Pzha7LcqD4No9vH3itdk4KQ5wQeyGzZjYt"
   LiteClient: "bin/lite-client"
   LiteClientConfig: "ton-lite-client-test1.config.json"
   ResolveQuery: "resolve-query.fif"
