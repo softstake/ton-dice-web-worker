@@ -12,7 +12,7 @@ RUN git config --global url."git@github.com:".insteadOf "https://github.com/"
 RUN touch /root/.ssh/known_hosts
 RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 
-RUN git clone -b new_contract git@github.com:tonradar/ton-api.git
+RUN git clone git@github.com:tonradar/ton-api.git
 
 WORKDIR /go/src/build
 ADD . .
