@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/cloudflare/cfssl/log"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -17,13 +17,17 @@ import (
 	"ton-dice-web-worker/config"
 )
 
+const (
+	ResolveQueryFileName = "resolve-query.fif"
+)
+
 type Resolver struct {
-	conf          config.Config
+	conf          *config.TonWebWorkerConfig
 	apiClient     api.TonApiClient
 	storageClient store.BetsClient
 }
 
-func NewResolver(conf config.Config, apiClient api.TonApiClient, storageClient store.BetsClient) *Resolver {
+func NewResolver(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, storageClient store.BetsClient) *Resolver {
 	return &Resolver{
 		conf:          conf,
 		apiClient:     apiClient,
@@ -32,7 +36,7 @@ func NewResolver(conf config.Config, apiClient api.TonApiClient, storageClient s
 }
 
 func (f *Resolver) ResolveQuery(betId int, seed string) error {
-	fileNameWithPath := f.conf.Service.ResolveQuery
+	fileNameWithPath := ResolveQueryFileName
 	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
 	fileName := fileNameWithPath[fileNameStart+1:]
 
@@ -41,19 +45,19 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 	_ = os.Remove(bocFile)
 
 	var out bytes.Buffer
-	cmd := exec.Command("fift", "-s", fileNameWithPath, f.conf.Service.KeyFileBase, f.conf.Service.ContractAddress, strconv.Itoa(betId), seed)
+	cmd := exec.Command("fift", "-s", fileNameWithPath, f.conf.KeyFileBase, f.conf.ContractAddr, strconv.Itoa(betId), seed)
 
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("cmd.Run() failed with %s\n", err)
+		log.Printf("cmd.Run() failed with: %v\n", err)
 		return err
 	}
 
 	if FileExists(bocFile) {
 		data, err := ioutil.ReadFile(bocFile)
 		if err != nil {
-			log.Error(err)
+			log.Println(err)
 		}
 
 		sendMessageRequest := &api.SendMessageRequest{
@@ -62,16 +66,16 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 
 		sendMessageResponse, err := f.apiClient.SendMessage(context.Background(), sendMessageRequest)
 		if err != nil {
-			log.Errorf("failed ResolveQuery method with: %v", err)
+			log.Printf("failed send message: %v\n", err)
 			return err
 		}
 
-		fmt.Printf("ResolveBet: send message status: %v", sendMessageResponse.Ok)
+		log.Printf("send message status: %v\n", sendMessageResponse.Ok)
 
 		return nil
 	}
 
-	return fmt.Errorf("File not found, maybe fift compile failed?")
+	return fmt.Errorf("file not found, maybe fift compile failed")
 }
 
 func (f *Resolver) isBetCreated(ctx context.Context, id int32) (*store.IsBetCreatedResponse, error) {
@@ -93,7 +97,7 @@ func (f *Resolver) Start() {
 		getActiveBetsReq := &api.GetActiveBetsRequest{}
 		getActiveBetsResp, err := f.apiClient.GetActiveBets(ctx, getActiveBetsReq)
 		if err != nil {
-			log.Errorf("failed to get active bets: %v", err)
+			log.Printf("failed to get active bets: %v\n", err)
 			continue
 		}
 		bets := getActiveBetsResp.GetBets()
@@ -101,30 +105,30 @@ func (f *Resolver) Start() {
 		for _, bet := range bets {
 			isBetCreated, err := f.isBetCreated(ctx, bet.Id)
 			if err != nil {
-				log.Error(err)
+				log.Println(err)
 				continue
 			}
 
-			if isBetCreated.Yes {
-				log.Info("the bet is already in storage")
+			if isBetCreated.IsCreated {
+				log.Println("the bet is already in storage")
 				continue
 			}
 
 			req, err := BuildCreateBetRequest(bet)
 			if err != nil {
-				log.Errorf("failed to build create bet request: %v", err)
+				log.Printf("failed to build create bet request: %v\n", err)
 				continue
 			}
 
 			_, err = f.storageClient.CreateBet(ctx, req)
 			if err != nil {
-				log.Errorf("save bet in DB failed with %s\n", err)
+				log.Printf("save bet in DB failed: %v\n", err)
 				continue
 			}
 
 			err = f.ResolveQuery(int(bet.Id), bet.Seed)
 			if err != nil {
-				log.Errorf("failed to resolve bet with %s\n", err)
+				log.Printf("failed to resolve bet: %v\n", err)
 				continue
 			}
 		}
