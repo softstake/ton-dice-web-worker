@@ -2,8 +2,8 @@ package worker
 
 import (
 	"context"
-	"github.com/cloudflare/cfssl/log"
 	"io/ioutil"
+	"log"
 	"strconv"
 	"time"
 
@@ -52,7 +52,7 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 
 	fetchTransactionsResponse, err := f.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
 	if err != nil {
-		log.Error(err)
+		log.Println(err)
 	}
 
 	transactions := fetchTransactionsResponse.Items
@@ -62,18 +62,18 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 		for _, outMsg := range trx.OutMsgs {
 			gameResult, err := parseOutMessage(outMsg.Message)
 			if err != nil {
-				log.Errorf("output message parse failed with %s\n", err)
+				log.Printf("parse output message failed: %v\n", err)
 				continue
 			}
 
 			isBetResolved, err := f.isBetResolved(ctx, int32(gameResult.Id))
 			if err != nil {
-				log.Error(err)
+				log.Println(err)
 				continue
 			}
 
-			if isBetResolved.Yes {
-				log.Info("the bet is already resolved")
+			if isBetResolved.IsResolved {
+				log.Println("the bet is already resolved")
 				continue
 			}
 
@@ -91,7 +91,7 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 
 			_, err = f.storageClient.UpdateBet(ctx, req)
 			if err != nil {
-				log.Errorf("update bet in DB failed with %s\n", err)
+				log.Printf("update bet in DB failed: %v\n", err)
 				continue
 			}
 		}
@@ -120,7 +120,7 @@ func (f *Fetcher) Start() {
 		}
 		getAccountStateResponse, err := f.apiClient.GetAccountState(ctx, getAccountStateRequest)
 		if err != nil {
-			log.Errorf("failed GetAccountState with error: %v", err)
+			log.Printf("failed get account state: %v\n", err)
 			continue
 		}
 
@@ -129,14 +129,14 @@ func (f *Fetcher) Start() {
 
 		savedTrxLt, err := GetSavedTrxLt(SavedTrxLtFileName)
 		if err != nil {
-			log.Errorf("Error get read saved trx time: %v", err)
+			log.Printf("failed read saved trx lt: %v\n", err)
 			return
 		}
 
 		if lt > int64(savedTrxLt) {
 			err = ioutil.WriteFile(SavedTrxLtFileName, []byte(strconv.Itoa(int(lt))), 0644)
 			if err != nil {
-				log.Errorf("Error write trx time to file: %v", err)
+				log.Printf("failed write trx lt: %v\n", err)
 				return
 			}
 

@@ -4,11 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/cloudflare/cfssl/log"
 	"github.com/joaojeronimo/go-crc16"
 	api "github.com/tonradar/ton-api/proto"
 	pb "github.com/tonradar/ton-dice-web-server/proto"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"os"
 	"regexp"
@@ -18,7 +18,7 @@ import (
 func parseOutMessage(m string) (*GameResult, error) {
 	msg, err := base64.StdEncoding.DecodeString(m)
 	if err != nil {
-		log.Errorf("message decode failed with %s\n", err)
+		log.Printf("message decode failed: %v\n", err)
 		return nil, err
 	}
 

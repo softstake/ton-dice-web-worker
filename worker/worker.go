@@ -2,8 +2,8 @@ package worker
 
 import (
 	"fmt"
-	"github.com/cloudflare/cfssl/log"
 	"google.golang.org/grpc"
+	"log"
 	"sync"
 
 	api "github.com/tonradar/ton-api/proto"
