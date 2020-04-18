@@ -8,8 +8,6 @@ RUN git config --global url."https://${GITHUB_TOKEN}:@github.com/".insteadOf "ht
 
 RUN git clone https://github.com/tonradar/ton-api.git
 
-RUN git clone git@github.com:tonradar/ton-api.git
-
 WORKDIR /go/src/build
 ADD . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dice-worker ./cmd
