@@ -16,8 +16,7 @@ FROM poma/ton
 WORKDIR /app
 COPY --from=builder /go/src/build/dice-worker /app/
 COPY --from=builder /go/src/build/resolve-query.fif /app/
-COPY --from=builder /go/src/build/owner.pk /app/
 COPY --from=builder /go/src/build/trxlt.save.default /app/
-RUN cp trxlt.save.default trxlt.save
+RUN mv trxlt.save.default trxlt.save
 
 ENTRYPOINT ./dice-worker
