@@ -79,7 +79,7 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 
 			req := &store.UpdateBetRequest{
 				Id:             int32(gameResult.Id),
-				RandomRoll:     int32(gameResult.Id),
+				RandomRoll:     int32(gameResult.RandomRoll),
 				PlayerPayout:   playerPayout,
 				ResolveTrxHash: resolveTrxHash,
 				ResolveTrxLt:   resolveTrxLt,
