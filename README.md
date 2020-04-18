@@ -15,6 +15,13 @@ Resolve bets:
   - change Makefile to use access token instead of SSH key
   - Update README.md to actual
 
+## ENV VARS
+	* CONTRACT_ADDR - contract address, required variable, no default value.
+	* KEY_FILE_BASE - full path (with filename) to the private key file, required variable, default value is `owner` just for development purposes.
+	* STORAGE_HOST - host of the `ton-dice-web-server` service, required variable, no default value.
+	* STORAGE_PORT - port of the `ton-dice-web-server` service, default value is `5300`.
+	* TON_API_HOST - host of the `ton-dice-api` service, required variable, no default value.
+	* TON_API_PORT - port of the `ton-dice-api` service, default value is '5400'. 
 
 ## build 
 ```MY_KEY=$(cat ~/.ssh/id_rsa)```
