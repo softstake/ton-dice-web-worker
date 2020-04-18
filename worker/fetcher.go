@@ -12,13 +12,17 @@ import (
 	"ton-dice-web-worker/config"
 )
 
+const (
+	SavedTrxLtFileName = "trxlt.save"
+)
+
 type Fetcher struct {
-	conf          config.Config
+	conf          *config.TonWebWorkerConfig
 	apiClient     api.TonApiClient
 	storageClient store.BetsClient
 }
 
-func NewFetcher(conf config.Config, apiClient api.TonApiClient, storageClient store.BetsClient) *Fetcher {
+func NewFetcher(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, storageClient store.BetsClient) *Fetcher {
 	return &Fetcher{
 		conf:          conf,
 		apiClient:     apiClient,
@@ -41,7 +45,7 @@ func (f *Fetcher) isBetResolved(ctx context.Context, id int32) (*store.IsBetReso
 
 func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth int) (int64, string) {
 	fetchTransactionsRequest := &api.FetchTransactionsRequest{
-		Address: f.conf.Service.ContractAddress,
+		Address: f.conf.ContractAddr,
 		Lt:      lt,
 		Hash:    hash,
 	}
@@ -112,7 +116,7 @@ func (f *Fetcher) Start() {
 	ctx := context.Background()
 	for {
 		getAccountStateRequest := &api.GetAccountStateRequest{
-			AccountAddress: f.conf.Service.ContractAddress,
+			AccountAddress: f.conf.ContractAddr,
 		}
 		getAccountStateResponse, err := f.apiClient.GetAccountState(ctx, getAccountStateRequest)
 		if err != nil {
@@ -123,14 +127,14 @@ func (f *Fetcher) Start() {
 		lt := getAccountStateResponse.LastTransactionId.Lt
 		hash := getAccountStateResponse.LastTransactionId.Hash
 
-		savedTrxLt, err := GetSavedTrxLt(f.conf.Service.SavedTrxLt)
+		savedTrxLt, err := GetSavedTrxLt(SavedTrxLtFileName)
 		if err != nil {
 			log.Errorf("Error get read saved trx time: %v", err)
 			return
 		}
 
 		if lt > int64(savedTrxLt) {
-			err = ioutil.WriteFile(f.conf.Service.SavedTrxLt, []byte(strconv.Itoa(int(lt))), 0644)
+			err = ioutil.WriteFile(SavedTrxLtFileName, []byte(strconv.Itoa(int(lt))), 0644)
 			if err != nil {
 				log.Errorf("Error write trx time to file: %v", err)
 				return

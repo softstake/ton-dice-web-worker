@@ -17,13 +17,17 @@ import (
 	"ton-dice-web-worker/config"
 )
 
+const (
+	ResolveQueryFileName = "resolve-query.fif"
+)
+
 type Resolver struct {
-	conf          config.Config
+	conf          *config.TonWebWorkerConfig
 	apiClient     api.TonApiClient
 	storageClient store.BetsClient
 }
 
-func NewResolver(conf config.Config, apiClient api.TonApiClient, storageClient store.BetsClient) *Resolver {
+func NewResolver(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, storageClient store.BetsClient) *Resolver {
 	return &Resolver{
 		conf:          conf,
 		apiClient:     apiClient,
@@ -32,7 +36,7 @@ func NewResolver(conf config.Config, apiClient api.TonApiClient, storageClient s
 }
 
 func (f *Resolver) ResolveQuery(betId int, seed string) error {
-	fileNameWithPath := f.conf.Service.ResolveQuery
+	fileNameWithPath := ResolveQueryFileName
 	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
 	fileName := fileNameWithPath[fileNameStart+1:]
 
@@ -41,7 +45,7 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 	_ = os.Remove(bocFile)
 
 	var out bytes.Buffer
-	cmd := exec.Command("fift", "-s", fileNameWithPath, f.conf.Service.KeyFileBase, f.conf.Service.ContractAddress, strconv.Itoa(betId), seed)
+	cmd := exec.Command("fift", "-s", fileNameWithPath, f.conf.KeyFileBase, f.conf.ContractAddr, strconv.Itoa(betId), seed)
 
 	cmd.Stderr = &out
 	err := cmd.Run()
