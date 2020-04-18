@@ -26,13 +26,13 @@ func NewWorkerService(conf *config.TonWebWorkerConfig) *WorkerService {
 		grpc.WithInsecure(),
 	}
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", conf.StorageHost, conf.StoragePort), opts...)
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", conf.StorageHost, conf.StoragePort), opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 	}
 	storageClient := store.NewBetsClient(conn)
 
-	conn, err = grpc.Dial(fmt.Sprintf("%s:%s", conf.TonAPIHost, conf.TonAPIPort), opts...)
+	conn, err = grpc.Dial(fmt.Sprintf("%s:%d", conf.TonAPIHost, conf.TonAPIPort), opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 	}
