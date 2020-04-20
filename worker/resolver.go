@@ -36,6 +36,7 @@ func NewResolver(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, st
 }
 
 func (f *Resolver) ResolveQuery(betId int, seed string) error {
+	log.Printf("Resolving bet with id %d...", betId)
 	fileNameWithPath := ResolveQueryFileName
 	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
 	fileName := fileNameWithPath[fileNameStart+1:]
@@ -92,6 +93,7 @@ func (f *Resolver) isBetCreated(ctx context.Context, id int32) (*store.IsBetCrea
 }
 
 func (f *Resolver) Start() {
+	log.Println("Resolver start")
 	for {
 		ctx := context.Background()
 
@@ -102,6 +104,8 @@ func (f *Resolver) Start() {
 			continue
 		}
 		bets := getActiveBetsResp.GetBets()
+
+		log.Printf("%d active bets received from smart-contract", len(bets))
 
 		for _, bet := range bets {
 			isBetCreated, err := f.isBetCreated(ctx, bet.Id)

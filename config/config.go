@@ -8,7 +8,7 @@ import (
 
 type TonWebWorkerConfig struct {
 	ContractAddr string `env:"CONTRACT_ADDR,required"`
-	KeyFileBase  string `env:"KEY_FILE_BASE" envDefault:"owner"`
+	KeyFileBase  string `env:"PK_FILE_PATH" envDefault:"owner.pk"`
 	StorageHost  string `env:"STORAGE_HOST,required"`
 	StoragePort  int32  `env:"STORAGE_PORT" envDefault:"5300"`
 	TonAPIHost   string `env:"TON_API_HOST,required"`

@@ -16,7 +16,7 @@ $3 parse-int =: bet_id
 $4 parse-int =: seed
 def? $5 { @' $5 } { "resolve-query" } cond constant savefile
 
-file-base +".pk" file>B constant wallet_pk
+file-base file>B constant wallet_pk
 
 seed wallet_pk ed25519_sign_uint constant sig
 
