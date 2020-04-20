@@ -92,8 +92,9 @@ func (f *Resolver) isBetCreated(ctx context.Context, id int32) (*store.IsBetCrea
 }
 
 func (f *Resolver) Start() {
-	ctx := context.Background()
 	for {
+		ctx := context.Background()
+
 		getActiveBetsReq := &api.GetActiveBetsRequest{}
 		getActiveBetsResp, err := f.apiClient.GetActiveBets(ctx, getActiveBetsReq)
 		if err != nil {

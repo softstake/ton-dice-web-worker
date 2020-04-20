@@ -43,7 +43,9 @@ func (f *Fetcher) isBetResolved(ctx context.Context, id int32) (*store.IsBetReso
 	return resp, nil
 }
 
-func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth int) (int64, string) {
+func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string) {
+	ctx := context.Background()
+
 	fetchTransactionsRequest := &api.FetchTransactionsRequest{
 		Address: f.conf.ContractAddr,
 		Lt:      lt,
@@ -53,6 +55,7 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 	fetchTransactionsResponse, err := f.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
 	if err != nil {
 		log.Println(err)
+		return lt, hash
 	}
 
 	transactions := fetchTransactionsResponse.Items
@@ -105,7 +108,7 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 		if depth > 0 {
 			depth -= 1
 			time.Sleep(timeout * time.Millisecond)
-			return f.FetchResults(ctx, _lt, _hash, depth)
+			return f.FetchResults(_lt, _hash, depth)
 		}
 	}
 
@@ -113,12 +116,11 @@ func (f *Fetcher) FetchResults(ctx context.Context, lt int64, hash string, depth
 }
 
 func (f *Fetcher) Start() {
-	ctx := context.Background()
 	for {
 		getAccountStateRequest := &api.GetAccountStateRequest{
 			AccountAddress: f.conf.ContractAddr,
 		}
-		getAccountStateResponse, err := f.apiClient.GetAccountState(ctx, getAccountStateRequest)
+		getAccountStateResponse, err := f.apiClient.GetAccountState(context.Background(), getAccountStateRequest)
 		if err != nil {
 			log.Printf("failed get account state: %v\n", err)
 			continue
@@ -140,7 +142,7 @@ func (f *Fetcher) Start() {
 				return
 			}
 
-			f.FetchResults(ctx, lt, hash, 3)
+			f.FetchResults(lt, hash, 3)
 		}
 
 		time.Sleep(timeout * time.Millisecond)

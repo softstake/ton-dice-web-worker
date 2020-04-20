@@ -24,6 +24,7 @@ type WorkerService struct {
 func NewWorkerService(conf *config.TonWebWorkerConfig) *WorkerService {
 	opts := []grpc.DialOption{
 		grpc.WithInsecure(),
+		withClientUnaryInterceptor(),
 	}
 
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", conf.StorageHost, conf.StoragePort), opts...)
