@@ -53,6 +53,8 @@ func (s *WorkerService) Run() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	log.Println("Worker start")
+
 	go s.fetcher.Start()
 	s.resolver.Start()
 

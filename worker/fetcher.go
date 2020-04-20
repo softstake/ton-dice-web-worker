@@ -116,6 +116,7 @@ func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string)
 }
 
 func (f *Fetcher) Start() {
+	log.Println("Fetcher start")
 	for {
 		getAccountStateRequest := &api.GetAccountStateRequest{
 			AccountAddress: f.conf.ContractAddr,
@@ -128,6 +129,8 @@ func (f *Fetcher) Start() {
 
 		lt := getAccountStateResponse.LastTransactionId.Lt
 		hash := getAccountStateResponse.LastTransactionId.Hash
+
+		log.Printf("current hash: %s, current lt: %d", hash, lt)
 
 		savedTrxLt, err := GetSavedTrxLt(SavedTrxLtFileName)
 		if err != nil {

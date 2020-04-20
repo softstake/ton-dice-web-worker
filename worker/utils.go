@@ -22,6 +22,8 @@ func parseOutMessage(m string) (*GameResult, error) {
 		return nil, err
 	}
 
+	log.Printf("Message received: %s", string(msg))
+
 	if len(msg) > 0 {
 		r, _ := regexp.Compile(`TONBET.IO - lucky number (\d+) fell for betting with id (\d+)`)
 		matches := r.FindStringSubmatch(string(msg))
