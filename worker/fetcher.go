@@ -2,57 +2,35 @@ package worker
 
 import (
 	"context"
-	"io/ioutil"
+	"github.com/golang/protobuf/ptypes"
 	"log"
-	"strconv"
 	"time"
 
 	api "github.com/tonradar/ton-api/proto"
 	store "github.com/tonradar/ton-dice-web-server/proto"
-	"ton-dice-web-worker/config"
-)
-
-const (
-	SavedTrxLtFileName = "trxlt.save"
 )
 
 type Fetcher struct {
-	conf          *config.TonWebWorkerConfig
-	apiClient     api.TonApiClient
-	storageClient store.BetsClient
+	worker *WorkerService
 }
 
-func NewFetcher(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, storageClient store.BetsClient) *Fetcher {
+func NewFetcher(worker *WorkerService) *Fetcher {
+	log.Println("Fetcher init...")
 	return &Fetcher{
-		conf:          conf,
-		apiClient:     apiClient,
-		storageClient: storageClient,
+		worker: worker,
 	}
-}
-
-func (f *Fetcher) isBetResolved(ctx context.Context, id int32) (*store.IsBetResolvedResponse, error) {
-	isBetResolvedReq := &store.IsBetResolvedRequest{
-		Id: id,
-	}
-
-	resp, err := f.storageClient.IsBetResolved(ctx, isBetResolvedReq)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
 }
 
 func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string) {
 	ctx := context.Background()
 
 	fetchTransactionsRequest := &api.FetchTransactionsRequest{
-		Address: f.conf.ContractAddr,
+		Address: f.worker.conf.ContractAddr,
 		Lt:      lt,
 		Hash:    hash,
 	}
 
-	fetchTransactionsResponse, err := f.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
+	fetchTransactionsResponse, err := f.worker.apiClient.FetchTransactions(ctx, fetchTransactionsRequest)
 	if err != nil {
 		log.Println(err)
 		return lt, hash
@@ -61,22 +39,26 @@ func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string)
 	transactions := fetchTransactionsResponse.Items
 	var trx *api.Transaction
 
+	log.Printf("Fetched %d transactions", len(transactions))
+
 	for _, trx = range transactions {
+		log.Printf("Processing a transaction with lt %d and hash %s", trx.TransactionId.Lt, trx.TransactionId.Hash)
 		for _, outMsg := range trx.OutMsgs {
 			gameResult, err := parseOutMessage(outMsg.Message)
 			if err != nil {
-				log.Printf("parse output message failed: %v\n", err)
+				log.Printf("Parse output message failed: %v\n", err)
 				continue
 			}
+			log.Printf("Game with id %d and random roll %d is defined", gameResult.Id, gameResult.RandomRoll)
 
-			isBetResolved, err := f.isBetResolved(ctx, int32(gameResult.Id))
+			isBetResolved, err := f.worker.isBetResolved(ctx, int32(gameResult.Id))
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 
 			if isBetResolved.IsResolved {
-				log.Println("the bet is already resolved")
+				log.Println("The bet is already resolved, proceed to the next transaction...")
 				continue
 			}
 
@@ -84,19 +66,23 @@ func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string)
 			resolveTrxHash := trx.TransactionId.Hash
 			resolveTrxLt := trx.TransactionId.Lt
 
+			resolvedAt := ptypes.TimestampNow()
+
 			req := &store.UpdateBetRequest{
 				Id:             int32(gameResult.Id),
 				RandomRoll:     int32(gameResult.RandomRoll),
 				PlayerPayout:   playerPayout,
+				ResolvedAt:     resolvedAt,
 				ResolveTrxHash: resolveTrxHash,
 				ResolveTrxLt:   resolveTrxLt,
 			}
 
-			_, err = f.storageClient.UpdateBet(ctx, req)
+			_, err = f.worker.storageClient.UpdateBet(ctx, req)
 			if err != nil {
-				log.Printf("update bet in DB failed: %v\n", err)
+				log.Printf("Update bet in DB failed: %v\n", err)
 				continue
 			}
+			log.Printf("Bet with id %d successfully updated", gameResult.Id)
 		}
 	}
 
@@ -116,12 +102,12 @@ func (f *Fetcher) FetchResults(lt int64, hash string, depth int) (int64, string)
 }
 
 func (f *Fetcher) Start() {
-	log.Println("Fetcher start")
+	log.Println("Start fetching game results...")
 	for {
 		getAccountStateRequest := &api.GetAccountStateRequest{
-			AccountAddress: f.conf.ContractAddr,
+			AccountAddress: f.worker.conf.ContractAddr,
 		}
-		getAccountStateResponse, err := f.apiClient.GetAccountState(context.Background(), getAccountStateRequest)
+		getAccountStateResponse, err := f.worker.apiClient.GetAccountState(context.Background(), getAccountStateRequest)
 		if err != nil {
 			log.Printf("failed get account state: %v\n", err)
 			continue
@@ -132,21 +118,7 @@ func (f *Fetcher) Start() {
 
 		log.Printf("current hash: %s, current lt: %d", hash, lt)
 
-		savedTrxLt, err := GetSavedTrxLt(SavedTrxLtFileName)
-		if err != nil {
-			log.Printf("failed read saved trx lt: %v\n", err)
-			return
-		}
-
-		if lt > int64(savedTrxLt) {
-			err = ioutil.WriteFile(SavedTrxLtFileName, []byte(strconv.Itoa(int(lt))), 0644)
-			if err != nil {
-				log.Printf("failed write trx lt: %v\n", err)
-				return
-			}
-
-			f.FetchResults(lt, hash, 3)
-		}
+		f.FetchResults(lt, hash, 3)
 
 		time.Sleep(timeout * time.Millisecond)
 	}
