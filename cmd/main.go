@@ -7,6 +7,12 @@ import (
 
 func main() {
 	cfg := config.GetConfig()
+
 	service := worker.NewWorkerService(&cfg)
-	service.Run()
+
+	fetcher := worker.NewFetcher(service)
+	resolver := worker.NewResolver(service)
+
+	go fetcher.Start()
+	resolver.Start()
 }

@@ -1,10 +1,10 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"google.golang.org/grpc"
 	"log"
-	"sync"
 
 	api "github.com/tonradar/ton-api/proto"
 	store "github.com/tonradar/ton-dice-web-server/proto"
@@ -16,9 +16,9 @@ const (
 )
 
 type WorkerService struct {
-	conf     *config.TonWebWorkerConfig
-	resolver *Resolver
-	fetcher  *Fetcher
+	conf          *config.TonWebWorkerConfig
+	apiClient     api.TonApiClient
+	storageClient store.BetsClient
 }
 
 func NewWorkerService(conf *config.TonWebWorkerConfig) *WorkerService {
@@ -39,24 +39,35 @@ func NewWorkerService(conf *config.TonWebWorkerConfig) *WorkerService {
 	}
 	apiClient := api.NewTonApiClient(conn)
 
-	resolver := NewResolver(conf, apiClient, storageClient)
-	fetcher := NewFetcher(conf, apiClient, storageClient)
-
 	return &WorkerService{
-		conf:     conf,
-		resolver: resolver,
-		fetcher:  fetcher,
+		conf:          conf,
+		apiClient:     apiClient,
+		storageClient: storageClient,
 	}
 }
 
-func (s *WorkerService) Run() {
-	var wg sync.WaitGroup
-	wg.Add(1)
+func (s *WorkerService) isBetSaved(ctx context.Context, id int32) (*store.IsBetSavedResponse, error) {
+	isBetFetchedReq := &store.IsBetSavedRequest{
+		Id: id,
+	}
 
-	log.Println("Worker start")
+	resp, err := s.storageClient.IsBetSaved(ctx, isBetFetchedReq)
+	if err != nil {
+		return nil, err
+	}
 
-	go s.fetcher.Start()
-	s.resolver.Start()
+	return resp, nil
+}
 
-	wg.Wait()
+func (s *WorkerService) isBetResolved(ctx context.Context, id int32) (*store.IsBetResolvedResponse, error) {
+	isBetResolvedReq := &store.IsBetResolvedRequest{
+		Id: id,
+	}
+
+	resp, err := s.storageClient.IsBetResolved(ctx, isBetResolvedReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

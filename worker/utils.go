@@ -16,13 +16,15 @@ import (
 )
 
 func parseOutMessage(m string) (*GameResult, error) {
+	log.Println("Start parsing an outgoing message...")
+
 	msg, err := base64.StdEncoding.DecodeString(m)
 	if err != nil {
-		log.Printf("message decode failed: %v\n", err)
+		log.Printf("Мessage decode failed: %v\n", err)
 		return nil, err
 	}
 
-	log.Printf("Message received: %s", string(msg))
+	log.Printf("Decoded message - '%s'", string(msg))
 
 	if len(msg) > 0 {
 		r, _ := regexp.Compile(`TONBET.IO - lucky number (\d+) fell for betting with id (\d+)`)
@@ -34,12 +36,15 @@ func parseOutMessage(m string) (*GameResult, error) {
 
 			return &GameResult{Id: betID, RandomRoll: randomRoll}, nil
 		}
+		log.Println("Message does not match expected pattern")
+	} else {
+		log.Println("Message is empty")
 	}
 
 	return nil, fmt.Errorf("message is not valid")
 }
 
-func BuildCreateBetRequest(bet *api.ActiveBet) (*pb.CreateBetRequest, error) {
+func BuildSaveBetRequest(bet *api.ActiveBet) (*pb.SaveBetRequest, error) {
 	i := new(big.Int)
 	i.SetString(bet.PlayerAddress.Address, 10)
 	hexPlayerAddr := fmt.Sprintf("%x", i)
@@ -62,7 +67,7 @@ func BuildCreateBetRequest(bet *api.ActiveBet) (*pb.CreateBetRequest, error) {
 		return nil, fmt.Errorf("invalid bet")
 	}
 
-	return &pb.CreateBetRequest{
+	return &pb.SaveBetRequest{
 		Id:            bet.Id,
 		PlayerAddress: playerAddr,
 		RefAddress:    refAddr,

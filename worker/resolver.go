@@ -13,8 +13,6 @@ import (
 	"time"
 
 	api "github.com/tonradar/ton-api/proto"
-	store "github.com/tonradar/ton-dice-web-server/proto"
-	"ton-dice-web-worker/config"
 )
 
 const (
@@ -22,20 +20,17 @@ const (
 )
 
 type Resolver struct {
-	conf          *config.TonWebWorkerConfig
-	apiClient     api.TonApiClient
-	storageClient store.BetsClient
+	worker *WorkerService
 }
 
-func NewResolver(conf *config.TonWebWorkerConfig, apiClient api.TonApiClient, storageClient store.BetsClient) *Resolver {
+func NewResolver(worker *WorkerService) *Resolver {
+	log.Println("Resolver init...")
 	return &Resolver{
-		conf:          conf,
-		apiClient:     apiClient,
-		storageClient: storageClient,
+		worker: worker,
 	}
 }
 
-func (f *Resolver) ResolveQuery(betId int, seed string) error {
+func (r *Resolver) ResolveQuery(betId int, seed string) error {
 	log.Printf("Resolving bet with id %d...", betId)
 	fileNameWithPath := ResolveQueryFileName
 	fileNameStart := strings.LastIndex(fileNameWithPath, "/")
@@ -46,7 +41,7 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 	_ = os.Remove(bocFile)
 
 	var out bytes.Buffer
-	cmd := exec.Command("fift", "-s", fileNameWithPath, f.conf.KeyFileBase, f.conf.ContractAddr, strconv.Itoa(betId), seed)
+	cmd := exec.Command("fift", "-s", fileNameWithPath, r.worker.conf.KeyFileBase, r.worker.conf.ContractAddr, strconv.Itoa(betId), seed)
 
 	cmd.Stderr = &out
 	err := cmd.Run()
@@ -65,7 +60,7 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 			Body: data,
 		}
 
-		sendMessageResponse, err := f.apiClient.SendMessage(context.Background(), sendMessageRequest)
+		sendMessageResponse, err := r.worker.apiClient.SendMessage(context.Background(), sendMessageRequest)
 		if err != nil {
 			log.Printf("failed send message: %v\n", err)
 			return err
@@ -79,26 +74,13 @@ func (f *Resolver) ResolveQuery(betId int, seed string) error {
 	return fmt.Errorf("file not found, maybe fift compile failed")
 }
 
-func (f *Resolver) isBetCreated(ctx context.Context, id int32) (*store.IsBetCreatedResponse, error) {
-	isBetFetchedReq := &store.IsBetCreatedRequest{
-		Id: id,
-	}
-
-	resp, err := f.storageClient.IsBetCreated(ctx, isBetFetchedReq)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-func (f *Resolver) Start() {
+func (r *Resolver) Start() {
 	log.Println("Resolver start")
 	for {
 		ctx := context.Background()
 
 		getActiveBetsReq := &api.GetActiveBetsRequest{}
-		getActiveBetsResp, err := f.apiClient.GetActiveBets(ctx, getActiveBetsReq)
+		getActiveBetsResp, err := r.worker.apiClient.GetActiveBets(ctx, getActiveBetsReq)
 		if err != nil {
 			log.Printf("failed to get active bets: %v\n", err)
 			continue
@@ -108,33 +90,41 @@ func (f *Resolver) Start() {
 		log.Printf("%d active bets received from smart-contract", len(bets))
 
 		for _, bet := range bets {
-			isBetCreated, err := f.isBetCreated(ctx, bet.Id)
+			isBetSaved, err := r.worker.isBetSaved(ctx, bet.Id)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 
-			if isBetCreated.IsCreated {
+			if !isBetSaved.IsSaved {
+				req, err := BuildSaveBetRequest(bet)
+				if err != nil {
+					log.Printf("failed to build create bet request: %v\n", err)
+					continue
+				}
+
+				_, err = r.worker.storageClient.SaveBet(ctx, req)
+				if err != nil {
+					log.Printf("save bet in DB failed: %v\n", err)
+					continue
+				}
+			} else {
 				log.Println("the bet is already in storage")
+			}
+
+			isBetResolved, err := r.worker.isBetResolved(ctx, bet.Id)
+			if err != nil {
+				log.Println(err)
 				continue
 			}
 
-			req, err := BuildCreateBetRequest(bet)
-			if err != nil {
-				log.Printf("failed to build create bet request: %v\n", err)
-				continue
-			}
-
-			_, err = f.storageClient.CreateBet(ctx, req)
-			if err != nil {
-				log.Printf("save bet in DB failed: %v\n", err)
-				continue
-			}
-
-			err = f.ResolveQuery(int(bet.Id), bet.Seed)
-			if err != nil {
-				log.Printf("failed to resolve bet: %v\n", err)
-				continue
+			if !isBetResolved.IsResolved {
+				err = r.ResolveQuery(int(bet.Id), bet.Seed)
+				if err != nil {
+					log.Printf("failed to resolve bet: %v\n", err)
+				}
+			} else {
+				log.Println("the bet is already resolved")
 			}
 		}
 
