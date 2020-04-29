@@ -117,7 +117,8 @@ func packSmcAddr(wc int8, hexAddr string, bounceble bool, testnet bool) (string,
 
 	crc := crc16.Crc16(x) // 2 bytes containing CRC16-CCITT of the previous 34 bytes
 
-	_crc, err := hex.DecodeString(fmt.Sprintf("%x", crc))
+	crcFix := fmt.Sprintf("%x", crc)
+	_crc, err := hex.DecodeString(fmt.Sprintf("%04s", crcFix))
 	if err != nil {
 		panic(err)
 	}
