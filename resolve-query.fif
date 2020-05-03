@@ -8,7 +8,6 @@
 $# 4 < ' usage if
 
 false constant bounce
-60 =: timeout   // external message expires in 60 seconds
 
 $1 =: file-base
 $2 bounce parse-load-address =: bounce 2=: dest_addr
@@ -20,9 +19,7 @@ file-base file>B constant wallet_pk
 
 seed wallet_pk ed25519_sign_uint constant sig
 
-now timeout + 32 << <b x{22222222} s, bet_id 32 u, sig B, b> hashu 32 1<<1- and + =: query-id
-
-<b query-id 64 u, x{22222222} s, bet_id 32 u, sig B, b> // body: seqno opcode betid sig
+<b 1 32 u, x{22222222} s, bet_id 32 u, sig B, b> // body: seqno opcode betid sig
 dup hashu wallet_pk ed25519_sign_uint // create signature of body
 
 <b b{1000100} s, dest_addr addr, 0 Gram, b{00} s, swap B, swap ref, b>
