@@ -27,12 +27,12 @@ func parseOutMessage(m string) (*GameResult, error) {
 	log.Printf("Decoded message - '%s'", string(msg))
 
 	if len(msg) > 0 {
-		r, _ := regexp.Compile(`TONBET.IO - lucky number (\d+) fell for betting with id (\d+)`)
+		r, _ := regexp.Compile(`TONBET.IO - \[#(\d+)] Your number is (\d+), all numbers greater than (\d+) have won.`)
 		matches := r.FindStringSubmatch(string(msg))
 
 		if len(matches) > 0 {
-			randomRoll, _ := strconv.Atoi(matches[1])
-			betID, _ := strconv.Atoi(matches[2])
+			randomRoll, _ := strconv.Atoi(matches[3])
+			betID, _ := strconv.Atoi(matches[1])
 
 			return &GameResult{Id: betID, RandomRoll: randomRoll}, nil
 		}
@@ -122,6 +122,7 @@ func packSmcAddr(wc int8, hexAddr string, bounceble bool, testnet bool) (string,
 	if err != nil {
 		panic(err)
 	}
+
 	x = append(x, _crc...)
 
 	encoded := base64.URLEncoding.EncodeToString(x)
